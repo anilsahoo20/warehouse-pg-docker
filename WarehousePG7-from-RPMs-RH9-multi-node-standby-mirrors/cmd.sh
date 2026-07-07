@@ -74,7 +74,13 @@ if sudo sshd -T 2>/dev/null | grep -qi "persourcepenalties"; then
 fi
 
 echo "Starting sshd ..."
-sudo /usr/sbin/sshd -o "ListenAddress=0.0.0.0"
+# All hosts bootstrap their ssh trust simultaneously at startup, so every node
+# receives a burst of concurrent unauthenticated ssh-copy-id connections from
+# the other 4 nodes (key-probe + install, for both gpadmin and root, plus retries).
+# sshd's default "MaxStartups 10:30:100" starts randomly dropping those connections
+# once 10 are in flight, which shows up as "Connection closed by <ip> port 22" and
+# makes gpinitsystem fail intermittently. Raise the limit so the boot storm is not throttled.
+sudo /usr/sbin/sshd -o "ListenAddress=0.0.0.0" -o "MaxStartups=200:30:400" -o "MaxSessions=200"
 echo "Starting sshd ... done"
 
 # directories already created in Dockerfile
@@ -202,11 +208,21 @@ fi
 #  - install ssh keys on the remote host
 # the hostfile_ssh_whpginitsystem file includes all extra hosts which do not run a database
 SSH_HOSTFILE="/home/${WHPG_USER}/hostfile_ssh_whpginitsystem"
+
+# All nodes run this script at the same time, so they all push ssh keys to each
+# other simultaneously. On emulated platforms (e.g. linux/amd64 under Rosetta on
+# Apple Silicon) the mutual crypto load saturates the CPU and ssh handshakes get
+# reset ("Connection closed/reset by peer"). A small random stagger spreads the
+# herd so the key exchange converges instead of every node hammering at once.
+JITTER=$(( RANDOM % 8 ))
+echo "Staggering ssh bootstrap by ${JITTER}s to reduce the startup storm ..."
+sleep ${JITTER}
+
 while IFS= read -r host; do
     [[ -z "${host}" ]] && continue
 
     host_available=0
-    for ((i=0; i<10; i++)); do
+    for ((i=0; i<120; i++)); do
         if ping -c 1 -W 1 "${host}" >/dev/null 2>&1; then
             host_available=1
             break
@@ -220,7 +236,7 @@ while IFS= read -r host; do
     fi
 
     ssh_available=0
-    for ((i=0; i<10; i++)); do
+    for ((i=0; i<120; i++)); do
         if nc -z "${host}" "22" >/dev/null 2>&1; then
             ssh_available=1
             break
@@ -251,13 +267,13 @@ while IFS= read -r host; do
     # THIS IS UNSAFE AND NOT FOR PRODUCTION!
     # install ssh keys on the other host
     echo "Adding ssh keys for user ${WHPG_USER} to host ${host}"
-    ssh_max_attempts=5
+    ssh_max_attempts=40
     ssh_attempt_num=1
     ssh_operation_successful=false
     ssh_check_logs=false
     while [ $ssh_attempt_num -le $ssh_max_attempts ]; do
         echo "Attempt ${ssh_attempt_num}/${ssh_max_attempts}: Adding keys for user ${WHPG_USER} to host ${host} ..."
-        sshpass -p "${PASSWORD}" ssh-copy-id -o StrictHostKeyChecking=no "${WHPG_USER}@${host}" > /tmp/add-ssh-keys-user-${ssh_attempt_num}.log 2>&1
+        sshpass -p "${PASSWORD}" ssh-copy-id -o StrictHostKeyChecking=no -o ConnectTimeout=10 "${WHPG_USER}@${host}" > /tmp/add-ssh-keys-user-${ssh_attempt_num}.log 2>&1
         #sshpass -p "${PASSWORD}" ssh-copy-id -o StrictHostKeyChecking=no "${WHPG_USER}@${host}"
         exit_status=$?
 
@@ -276,9 +292,9 @@ while IFS= read -r host; do
         echo "Attempt ${ssh_attempt_num} failed with exit code ${exit_status}."
 
         if [ $ssh_attempt_num -lt $ssh_max_attempts ]; then
-            echo "Retrying in 1 second..."
+            echo "Retrying in 2 seconds..."
             ssh_check_logs=true
-            sleep 1
+            sleep 2
         fi
 
         ssh_attempt_num=$((ssh_attempt_num + 1))
@@ -291,7 +307,7 @@ while IFS= read -r host; do
     # occasionally the files are not owned by root - don't know why
     #sudo ls -ld /etc/ssh/* /etc/ssh-install/*
     echo "Adding ssh keys for user root to host ${host}"
-    ssh_max_attempts=5
+    ssh_max_attempts=40
     ssh_attempt_num=1
     ssh_operation_successful=false
     while [ $ssh_attempt_num -le $ssh_max_attempts ]; do
@@ -300,7 +316,7 @@ while IFS= read -r host; do
         # run another chown, all files in /etc/ssh/ are supposed to be root owned
         sudo chown -R root:root /etc/ssh/
         echo "Attempt ${ssh_attempt_num}/${ssh_max_attempts}: Adding keys for user root to host ${host} ..."
-        sudo sh -c 'sshpass -v -p "'${PASSWORD}'" ssh-copy-id -o StrictHostKeyChecking=no "root@'${host}'" > /tmp/add-ssh-keys-root-'${ssh_attempt_num}'.log 2>&1'
+        sudo sh -c 'sshpass -v -p "'${PASSWORD}'" ssh-copy-id -o StrictHostKeyChecking=no -o ConnectTimeout=10 "root@'${host}'" > /tmp/add-ssh-keys-root-'${ssh_attempt_num}'.log 2>&1'
         #sudo sh -c 'sshpass -v -p "'${PASSWORD}'" ssh-copy-id -o StrictHostKeyChecking=no "root@'${host}'"'
         exit_status=$?
 
@@ -319,9 +335,9 @@ while IFS= read -r host; do
         echo "Attempt ${ssh_attempt_num} failed with exit code ${exit_status}."
 
         if [ $ssh_attempt_num -lt $ssh_max_attempts ]; then
-            echo "Retrying in 1 second..."
+            echo "Retrying in 2 seconds..."
             ssh_check_logs=true
-            sleep 1
+            sleep 2
         fi
 
         ssh_attempt_num=$((ssh_attempt_num + 1))
@@ -345,9 +361,9 @@ fi
 # eventually the hosts finish the setup, but we might need the file earlier
 SSH_HOSTS=$(cat "$SSH_HOSTFILE")
 SSH_ALL_HOSTS_FOUND=1
-# start the retry loop (10 attempts max)
-for i in {1..10}; do
-    echo "Authorized Keys Check: Attempt ${i}/10"
+# start the retry loop (120 attempts max)
+for i in {1..120}; do
+    echo "Authorized Keys Check: Attempt ${i}/120"
     SSH_ALL_HOSTS_FOUND=0
 
     for SSH_HOSTNAME in ${SSH_HOSTS}; do
@@ -366,14 +382,14 @@ for i in {1..10}; do
     fi
 
     # If not all hosts were found, and it's not the last attempt, wait
-    if [ ${i} -lt 10 ]; then
+    if [ ${i} -lt 120 ]; then
         echo "Waiting 1 second before retrying the test ..."
         sleep 1
     fi
 done
 
 if [ $SSH_ALL_HOSTS_FOUND -ne 0 ]; then
-    echo "ERROR: Not all hosts were confirmed after 10 attempts"
+    echo "ERROR: Not all hosts were confirmed after 120 attempts"
     exit 1
 fi
 

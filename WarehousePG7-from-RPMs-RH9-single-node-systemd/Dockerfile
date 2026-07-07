@@ -3,18 +3,18 @@
 # define arguments as global variables
 # ENV settings are scoped locally per build stage, by design
 ARG GLOB_MAINTAINER="andreas.scherbaum@enterprisedb.com"
-ARG GLOB_DESCRIPTION="Dockerfile to run WarehousePG 6.x"
+ARG GLOB_DESCRIPTION="Dockerfile to run WarehousePG 7.x"
 ARG GLOB_IMAGE_TITLE="WarehousePG"
 ARG GLOB_IMAGE_DESCRIPTION="WarehousePG Database image"
 ARG GLOB_IMAGE_VERSION="0.1.1"
 ARG GLOB_IMAGE_AUTHORS="andreas.scherbaum@enterprisedb.com"
-ARG GLOB_MASTER_DATA_DIRECTORY=/whpgdata/master/whpgsne-1
+ARG GLOB_COORDINATOR_DATA_DIRECTORY=/whpgdata/coordinator/whpgsne-1
 ARG GLOB_WHPGHOME="/usr/local/greenplum-db"
 
 
 #######################################################################
-# use CentOS Linux as base image
-FROM centos:7 AS build-stage
+# use Rocky Linux as base image
+FROM rockylinux:9 AS build-stage
 ENV container=docker
 
 ARG GLOB_MAINTAINER
@@ -28,7 +28,7 @@ ARG GLOB_OS_VERSION
 ARG GLOB_BUILD_VERSION
 ARG GLOB_WHPGHOME
 #ARG LD_LIBRARY_PATH
-ARG GLOB_MASTER_DATA_DIRECTORY
+ARG GLOB_COORDINATOR_DATA_DIRECTORY
 
 # from commandline arguments
 ARG EDBTOKEN
@@ -53,7 +53,7 @@ ENV OS_VERSION=$GLOB_OS_VERSION
 ENV BUILD_VERSION=$GLOB_BUILD_VERSION
 ENV WHPGHOME=$GLOB_WHPGHOME
 #ENV LD_LIBRARY_PATH=$WHPGHOME/lib:$LD_LIBRARY_PATH
-ENV MASTER_DATA_DIRECTORY=$GLOB_MASTER_DATA_DIRECTORY
+ENV COORDINATOR_DATA_DIRECTORY=$GLOB_COORDINATOR_DATA_DIRECTORY
 ENV PATH=$WHPGHOME/bin:$PATH
 
 
@@ -61,24 +61,18 @@ ENV PATH=$WHPGHOME/bin:$PATH
 RUN --mount=type=secret,id=edbtoken_secret --mount=type=secret,id=edbrepository_secret curl -u token:$(cat /run/secrets/edbtoken_secret) -1sLf https://downloads.enterprisedb.com/basic/$(cat /run/secrets/edbrepository_secret)/setup.rpm.sh -o /root/setup.rpm.sh
 
 
-RUN sed -i s/mirror.centos.org/vault.centos.org/g /etc/yum.repos.d/*.repo
-RUN sed -i s/^#.*baseurl=http/baseurl=http/g /etc/yum.repos.d/*.repo
-RUN sed -i s/^mirrorlist=http/#mirrorlist=http/g /etc/yum.repos.d/*.repo
-RUN sed -i 's/mirrorlist/#mirrorlist/g' /etc/yum.repos.d/CentOS-*
-RUN sed -i 's|#baseurl=http://mirror.centos.org|baseurl=http://vault.centos.org|g' /etc/yum.repos.d/CentOS-*
-
 # install required packages for building WarehousePG
 #RUN localectl set-locale LANG=en_US.UTF-8
-RUN yum update -y
-RUN yum install -y epel-release
-RUN yum update -y
-#RUN yum install -y sudo
-#RUN yum install -y passwd
+RUN dnf update -y
+RUN dnf install -y epel-release
+RUN dnf update -y
+#RUN dnf install -y sudo
+#RUN dnf install -y passwd
 
 COPY rpm-packages-build-step.txt /root/rpm-packages-build-step.txt
-RUN yum install -y $(cat /root/rpm-packages-build-step.txt)
+RUN dnf install -y $(cat /root/rpm-packages-build-step.txt)
 
-RUN yum clean all
+RUN dnf clean all
 
 ENV LANG=en_US.UTF-8
 ENV LC_ALL=en_US.UTF-8
@@ -96,11 +90,11 @@ RUN /root/setup.rpm.sh
 
 # installation goes into /usr/local/greenplum-db-<version>,
 # and a symlink to /usr/local/greenplum-db is created
-RUN yum install -y warehouse-pg-6
+RUN dnf install -y warehouse-pg-7
 # clients are already included in the server package
-#RUN yum install -y warehouse-pg-clients
+#RUN dnf install -y warehouse-pg-clients
 # installation goes into /usr/local/bin
-RUN yum install -y whpg-backup
+RUN dnf install -y whpg-backup
 
 
 # switch to gpadmin user, do not build as root
@@ -110,7 +104,7 @@ USER gpadmin
 #######################################################################
 # database installed, but not started
 # build a new image, without the RPMs
-FROM centos:7 AS image-stage
+FROM rockylinux:9 AS image-stage
 ENV container=docker
 
 ARG GLOB_MAINTAINER
@@ -124,7 +118,7 @@ ARG GLOB_OS_VERSION
 ARG GLOB_BUILD_VERSION
 ARG GLOB_WHPGHOME
 #ARG LD_LIBRARY_PATH
-ARG GLOB_MASTER_DATA_DIRECTORY
+ARG GLOB_COORDINATOR_DATA_DIRECTORY
 
 # metadata
 LABEL maintainer=$GLOB_MAINTAINER
@@ -144,25 +138,37 @@ ENV OS_VERSION=$GLOB_OS_VERSION
 ENV BUILD_VERSION=$GLOB_BUILD_VERSION
 ENV WHPGHOME=$GLOB_WHPGHOME
 #ENV LD_LIBRARY_PATH=$WHPGHOME/lib:$LD_LIBRARY_PATH
-ENV MASTER_DATA_DIRECTORY=$GLOB_MASTER_DATA_DIRECTORY
+ENV COORDINATOR_DATA_DIRECTORY=$GLOB_COORDINATOR_DATA_DIRECTORY
 ENV PATH=$WHPGHOME/bin:$PATH
-
-RUN sed -i s/mirror.centos.org/vault.centos.org/g /etc/yum.repos.d/*.repo
-RUN sed -i s/^#.*baseurl=http/baseurl=http/g /etc/yum.repos.d/*.repo
-RUN sed -i s/^mirrorlist=http/#mirrorlist=http/g /etc/yum.repos.d/*.repo
-RUN sed -i 's/mirrorlist/#mirrorlist/g' /etc/yum.repos.d/CentOS-*
-RUN sed -i 's|#baseurl=http://mirror.centos.org|baseurl=http://vault.centos.org|g' /etc/yum.repos.d/CentOS-*
 
 # install required packages for running WarehousePG
 #RUN localectl set-locale LANG=en_US.UTF-8
-RUN yum update -y
-RUN yum install -y epel-release
-RUN yum update -y
+RUN dnf update -y
+RUN dnf groupinstall -y "Development Tools"
+RUN dnf install -y epel-release
+RUN dnf update -y
 
 COPY rpm-packages-image-step.txt /root/rpm-packages-image-step.txt
-RUN yum install -y $(cat /root/rpm-packages-image-step.txt)
+RUN dnf install -y $(cat /root/rpm-packages-image-step.txt)
 
-RUN yum clean all
+RUN dnf install -y --enablerepo=crb libyaml libyaml-devel libuv-devel perl-IPC-Run
+
+# systemd is PID 1 in this image (run the container like a real RHEL9 host)
+RUN dnf install -y systemd openssh-server
+
+RUN dnf clean all
+
+# strip the units a container never needs (getty, login prompts, udev, etc.)
+# so the journal isn't full of failures for hardware that doesn't exist
+RUN (cd /lib/systemd/system/sysinit.target.wants/; \
+       for i in *; do [ "$i" = systemd-tmpfiles-setup.service ] || rm -f "$i"; done); \
+    rm -f /lib/systemd/system/multi-user.target.wants/*; \
+    rm -f /etc/systemd/system/*.wants/*; \
+    rm -f /lib/systemd/system/local-fs.target.wants/*; \
+    rm -f /lib/systemd/system/sockets.target.wants/*udev*; \
+    rm -f /lib/systemd/system/sockets.target.wants/*initctl*; \
+    rm -f /lib/systemd/system/basic.target.wants/*; \
+    rm -f /lib/systemd/system/anaconda.target.wants/*
 
 ENV LANG=en_US.UTF-8
 ENV LC_ALL=en_US.UTF-8
@@ -185,30 +191,42 @@ EXPOSE 30000-30010/tcp
 
 
 # copy installation over from the build stage image
-# the warehouse-pg-6 RPM installs into /usr/edb/whpg6 and only places
-# symlinks (greenplum-db, greenplum-db-clients) into /usr/local, so both
-# trees must be copied or the symlinks dangle and all binaries go missing
-RUN rm -rf /usr/local/* /usr/edb/*
+# warehouse-pg-7 installs into /usr/edb/whpg7 and creates a symlink
+# /usr/local/greenplum-db -> /usr/edb/whpg7, so both paths must be copied
+RUN rm -rf /usr/local/*
 COPY --from=build-stage /usr/local /usr/local
 COPY --from=build-stage /usr/edb /usr/edb
 
 
-# switch to gpadmin user, do not build image as root
-USER gpadmin
+# NOTE: unlike the tail-based image, we stay as root here.
+# systemd must run as PID 1 as root; gpadmin is re-entered via the
+# warehousepg.service unit's "User=gpadmin".
+
+# WarehousePG 7 uses Python 3.11, install required modules into that interpreter.
+# greenplum_path.sh puts WarehousePG's pg_config on PATH so psycopg2 can build from source.
+RUN bash -c ". ${WHPGHOME}/greenplum_path.sh && python3.11 -m pip install psycopg2"
+RUN bash -c ". ${WHPGHOME}/greenplum_path.sh && python3.11 -m pip install psutil"
 
 # Create data directories
-RUN sudo mkdir -p /whpgdata/master /whpgdata/segments /whpgdata/segments/whpgdata1 /whpgdata/segments/whpgdata2 && \
-    sudo chown -R gpadmin:gpadmin /whpgdata
+RUN mkdir -p /whpgdata/coordinator /whpgdata/segments /whpgdata/segments/whpgdata1 /whpgdata/segments/whpgdata2 && \
+    chown -R gpadmin:gpadmin /whpgdata
 
 
-COPY --chown=gpadmin:gpadmin hostfile_whpginitsystem6 /home/gpadmin/hostfile_whpginitsystem
-COPY --chown=gpadmin:gpadmin whpginitsystem_singlenode6 /home/gpadmin/whpginitsystem_singlenode
+COPY --chown=gpadmin:gpadmin hostfile_whpginitsystem7 /home/gpadmin/hostfile_whpginitsystem
+COPY --chown=gpadmin:gpadmin whpginitsystem_singlenode7 /home/gpadmin/whpginitsystem_singlenode
 # the chmod option needs buildx
-COPY --chown=gpadmin:gpadmin --chmod=0750 warehousepg_init6.sh /home/gpadmin/warehousepg_init.sh
-COPY --chown=gpadmin:gpadmin --chmod=0750 cmd.sh /home/gpadmin/cmd.sh
+COPY --chown=gpadmin:gpadmin --chmod=0750 warehousepg_init7.sh /home/gpadmin/warehousepg_init.sh
+
+# systemd-managed WarehousePG: a first-boot prep script + a unit that
+# runs gpinitsystem (first boot) or gpstart (subsequent boots) as gpadmin
+COPY --chmod=0755 warehousepg-setup.sh /usr/local/bin/warehousepg-setup.sh
+COPY --chmod=0755 warehousepg-poststart.sh /usr/local/bin/warehousepg-poststart.sh
+COPY warehousepg.service /etc/systemd/system/warehousepg.service
+RUN systemctl enable sshd.service warehousepg.service
+
 WORKDIR /home/gpadmin
 
+# clean systemd shutdown on `docker stop` -> triggers warehousepg.service ExecStop (gpstop)
+STOPSIGNAL SIGRTMIN+3
 
-#CMD ["bash"]
-#CMD ["tail", "-f", "/dev/null"]
-CMD ["/home/gpadmin/cmd.sh"]
+CMD ["/usr/sbin/init"]

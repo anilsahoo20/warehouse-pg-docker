@@ -162,7 +162,22 @@ RUN yum update -y
 COPY rpm-packages-image-step.txt /root/rpm-packages-image-step.txt
 RUN yum install -y $(cat /root/rpm-packages-image-step.txt)
 
+# systemd is PID 1 in this image (run the container like a real RHEL7 host)
+RUN yum install -y systemd
+
 RUN yum clean all
+
+# strip the units a container never needs (getty, login prompts, udev, etc.)
+# so the journal isn't full of failures for hardware that doesn't exist
+RUN (cd /lib/systemd/system/sysinit.target.wants/; \
+       for i in *; do [ "$i" = systemd-tmpfiles-setup.service ] || rm -f "$i"; done); \
+    rm -f /lib/systemd/system/multi-user.target.wants/*; \
+    rm -f /etc/systemd/system/*.wants/*; \
+    rm -f /lib/systemd/system/local-fs.target.wants/*; \
+    rm -f /lib/systemd/system/sockets.target.wants/*udev*; \
+    rm -f /lib/systemd/system/sockets.target.wants/*initctl*; \
+    rm -f /lib/systemd/system/basic.target.wants/*; \
+    rm -f /lib/systemd/system/anaconda.target.wants/*
 
 ENV LANG=en_US.UTF-8
 ENV LC_ALL=en_US.UTF-8
@@ -188,27 +203,35 @@ EXPOSE 30000-30010/tcp
 # the warehouse-pg-6 RPM installs into /usr/edb/whpg6 and only places
 # symlinks (greenplum-db, greenplum-db-clients) into /usr/local, so both
 # trees must be copied or the symlinks dangle and all binaries go missing
-RUN rm -rf /usr/local/* /usr/edb/*
-COPY --from=build-stage /usr/local /usr/local
+RUN rm -rf /usr/local/*
 COPY --from=build-stage /usr/edb /usr/edb
+COPY --from=build-stage /usr/local /usr/local
 
 
-# switch to gpadmin user, do not build image as root
-USER gpadmin
+# NOTE: unlike the tail-based image, we stay as root here.
+# systemd must run as PID 1 as root; gpadmin is re-entered via the
+# warehousepg.service unit's "User=gpadmin".
 
 # Create data directories
-RUN sudo mkdir -p /whpgdata/master /whpgdata/segments /whpgdata/segments/whpgdata1 /whpgdata/segments/whpgdata2 && \
-    sudo chown -R gpadmin:gpadmin /whpgdata
+RUN mkdir -p /whpgdata/master /whpgdata/segments /whpgdata/segments/whpgdata1 /whpgdata/segments/whpgdata2 && \
+    chown -R gpadmin:gpadmin /whpgdata
 
 
 COPY --chown=gpadmin:gpadmin hostfile_whpginitsystem6 /home/gpadmin/hostfile_whpginitsystem
 COPY --chown=gpadmin:gpadmin whpginitsystem_singlenode6 /home/gpadmin/whpginitsystem_singlenode
 # the chmod option needs buildx
 COPY --chown=gpadmin:gpadmin --chmod=0750 warehousepg_init6.sh /home/gpadmin/warehousepg_init.sh
-COPY --chown=gpadmin:gpadmin --chmod=0750 cmd.sh /home/gpadmin/cmd.sh
+
+# systemd-managed WarehousePG: a first-boot prep script + a unit that
+# runs gpinitsystem (first boot) or gpstart (subsequent boots) as gpadmin
+COPY --chmod=0755 warehousepg-setup.sh /usr/local/bin/warehousepg-setup.sh
+COPY --chmod=0755 warehousepg-poststart.sh /usr/local/bin/warehousepg-poststart.sh
+COPY warehousepg.service /etc/systemd/system/warehousepg.service
+RUN systemctl enable sshd.service warehousepg.service
+
 WORKDIR /home/gpadmin
 
+# clean systemd shutdown on `docker stop` -> triggers warehousepg.service ExecStop (gpstop)
+STOPSIGNAL SIGRTMIN+3
 
-#CMD ["bash"]
-#CMD ["tail", "-f", "/dev/null"]
-CMD ["/home/gpadmin/cmd.sh"]
+CMD ["/usr/sbin/init"]

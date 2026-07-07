@@ -10,14 +10,26 @@ services:
       - edbtoken_secret
       - edbrepository_secret
     ports:
-      - "6432:5432"
-      - "8081:8080"
+      - "6446:5432"
+      - "18085:8080"
+      - "17238:7233"
     volumes:
       - ./data:/whpgdata
+      - ./usr_local:/usr/local
+      # systemd needs the host cgroup hierarchy
+      - /sys/fs/cgroup:/sys/fs/cgroup:rw
+    # systemd-as-PID-1 requirements:
+    cgroup: host
+    tmpfs:
+      - /run
+      - /tmp
+    # clean systemd shutdown
+    stop_signal: SIGRTMIN+3
+    stop_grace_period: 60s
     environment:
       - container=docker
     platform: linux/amd64
-    hostname: whpgdb-primary
+    hostname: whpgdb
 
 secrets:
   edbtoken_secret:

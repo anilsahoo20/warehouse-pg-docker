@@ -1,0 +1,205 @@
+BUILD_VERSION="0.1"
+BUILD_IMAGE_TITLE="WarehousePG 7 Database"
+BUILD_IMAGE_DESCRIPTION="WarehousePG 7.x Database image"
+
+
+TCP_PORT="6447"
+
+
+include ../token.mk
+
+
+CURRENT_UID := $(shell id -u)
+
+
+all:
+	@echo ""
+	@echo "WarehousePG 7.x multi-node setup, built from RPMs, systemd"
+	@echo ""
+	@echo "build:    (Re)build the image"
+	@echo "run:      Start the image"
+	@echo "status:   Show Docker compose status"
+	@echo "psql:     Connect to the WarehousePG Database in the image"
+	@echo "access:   Get a shell in the image"
+	@echo "logs:     Show the Docker log for the image (systemd boot)"
+	@echo "journal:  Follow the warehousepg.service journal (DB start/stop)"
+	@echo "stop:     Stop the image (preserves state)"
+	@echo "start:    Start a previously stopped image"
+	@echo "restart:  Restart the image"
+	@echo "clean:    Remove all artifacts"
+
+build:
+	@# Docker may create the data directories already - as root
+	mkdir -p $(shell pwd)/data
+	@for i in coordinator standby seg1 seg2 gpfdist; do mkdir -p data/$$i data/$$i/data; done
+	DOCKER_BUILDKIT=1 docker compose up --build --no-start --remove-orphans
+	docker image prune -f
+	docker buildx prune -f
+
+run:	checksudo
+	@mkdir -p data
+	@sudo chown `id -un`:`id -gn` data data/* ; true
+	@for i in coordinator standby seg1 seg2 gpfdist; do mkdir -p data/$$i data/$$i/data; done
+	DOCKER_BUILDKIT=1 docker compose up --detach
+
+status:
+	docker compose ps
+
+psql:
+	@echo ""
+	@echo "Use:"
+	@echo ""
+	@printf "make psql-coordinator\t\tConnect psql to coordinator host"
+	@printf "make psql-standby\t\tConnect psql to standby host"
+	@echo ""
+
+psql-coordinator:
+	psql -h 127.0.0.1 -p 6447 -U gpadmin postgres
+
+psql-standby:
+	psql -h 127.0.0.1 -p 6449 -U gpadmin postgres
+
+stop:
+	docker compose stop -t 5
+	docker compose ps -a
+
+start:
+	docker compose start
+	docker compose ps
+
+restart:
+	docker compose restart
+	docker compose ps
+
+clean:	stop checksudo
+	docker compose rm -f
+	@#sudo rm -rf data
+	@if [ -d data ] && [ $$(find data -mindepth 1 -not -uid $(CURRENT_UID) -print -quit | wc -l) -gt 0 ]; then \
+		sudo rm -rf data; \
+	elif [ -d data ]; then \
+		rm -rf data; \
+	fi
+
+cleanall:	clean
+	docker image prune --all --force
+	docker network prune --force
+	docker system prune --all --force
+
+logs:
+	@echo ""
+	@echo "Use:"
+	@echo ""
+	@printf "make logs-coordinator\t\tShow logs from coordinator host\n"
+	@printf "make logs-standby\t\tShow logs from standby host\n"
+	@printf "make logs-seg1\t\t\tShow logs from segment host 1\n"
+	@printf "make logs-seg2\t\t\tShow logs from segment host 2\n"
+	@printf "make logs-gpfdist\t\t\tShow logs from gpfdist host\n"
+	@echo ""
+
+logs-coordinator:
+	docker compose logs -f coordinator
+
+logs-standby:
+	docker compose logs -f standby
+
+logs-seg1:
+	docker compose logs -f seg1
+
+logs-seg2:
+	docker compose logs -f seg2
+
+logs-gpfdist:
+	docker compose logs -f gpfdist
+
+journal:
+	@echo ""
+	@echo "Use:"
+	@echo ""
+	@printf "make journal-coordinator\tFollow the warehousepg.service journal on coordinator\n"
+	@printf "make journal-standby\t\tFollow the warehousepg.service journal on standby\n"
+	@printf "make journal-seg1\t\tFollow the warehousepg.service journal on segment host 1\n"
+	@printf "make journal-seg2\t\tFollow the warehousepg.service journal on segment host 2\n"
+	@printf "make journal-gpfdist\t\tFollow the warehousepg.service journal on gpfdist host\n"
+	@echo ""
+
+journal-coordinator:
+	docker compose exec coordinator journalctl -u warehousepg.service -f
+
+journal-standby:
+	docker compose exec standby journalctl -u warehousepg.service -f
+
+journal-seg1:
+	docker compose exec seg1 journalctl -u warehousepg.service -f
+
+journal-seg2:
+	docker compose exec seg2 journalctl -u warehousepg.service -f
+
+journal-gpfdist:
+	docker compose exec gpfdist journalctl -u warehousepg.service -f
+
+access:
+	@echo ""
+	@echo "Use:"
+	@echo ""
+	@printf "make access-coordinator\t\tConnect to coordinator host\n"
+	@printf "make access-standby\t\tConnect to standby host\n"
+	@printf "make access-seg1\t\tConnect to segment host 1\n"
+	@printf "make access-seg2\t\tConnect to segment host 2\n"
+	@printf "make access-gpfdist\t\tConnect to gpfdist host\n"
+	@echo ""
+
+access-coordinator:
+	@echo "Don't forget to run:"
+	@echo "  source /usr/local/greenplum-db/greenplum_path.sh"
+	@echo "psql command is:"
+	@echo "  psql whpgtest"
+	@docker compose exec coordinator /bin/bash
+
+access-standby:
+	@echo "Don't forget to run:"
+	@echo "  source /usr/local/greenplum-db/greenplum_path.sh"
+	@echo "psql command is:"
+	@echo "  psql whpgtest"
+	@docker compose exec standby /bin/bash
+
+access-seg1:
+	@echo ""
+	@echo "Segment databases running on ports: "`docker compose exec seg1 /home/gpadmin/list-seg-ports.sh`
+	@echo ""
+	@echo "Don't forget to run:"
+	@echo "  source /usr/local/greenplum-db/greenplum_path.sh"
+	@echo "psql command is (plus port):"
+	@echo "  PGOPTIONS='-c gp_session_role=utility' psql -d whpgtest -p "
+	@docker compose exec seg1 /bin/bash
+
+access-seg2:
+	@echo ""
+	@echo "Segment databases running on ports: "`docker compose exec seg2 /home/gpadmin/list-seg-ports.sh`
+	@echo ""
+	@echo "Don't forget to run:"
+	@echo "  source /usr/local/greenplum-db/greenplum_path.sh"
+	@echo "psql command is (plus port):"
+	@echo "  PGOPTIONS='-c gp_session_role=utility' psql -d whpgtest -p "
+	@docker compose exec seg2 /bin/bash
+
+access-gpfdist:
+	@echo "Don't forget to run:"
+	@echo "  source /usr/local/greenplum-db/greenplum_path.sh"
+	@docker compose exec gpfdist /bin/bash
+
+checksudo:
+	@if ! sudo -n true 2>/dev/null; then \
+		echo "Note: Entering a sudo password might be required ..."; \
+		echo "      The data/ directory contains files owned by another user"; \
+		echo "      This was caused by the Docker lab changing ownership of files"; \
+		echo ""; \
+	fi
+
+checklabsrunning:
+	../labs-are-running.sh
+
+.PHONY:	all build run start restart logs stop clean cleanall status checksudo checklabsrunning
+.PHONY: psql psql-coordinator psql-standby psql-seg1 psql-seg2
+.PHONY: access access-coordinator access-seg1 access-seg2 access-gpfdist
+.PHONY: logs logs-coordinator logs-seg1 logs-seg2 logs-gpfdist
+.PHONY: journal journal-coordinator journal-standby journal-seg1 journal-seg2 journal-gpfdist

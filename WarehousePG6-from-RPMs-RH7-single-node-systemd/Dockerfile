@@ -203,9 +203,9 @@ EXPOSE 30000-30010/tcp
 # the warehouse-pg-6 RPM installs into /usr/edb/whpg6 and only places
 # symlinks (greenplum-db, greenplum-db-clients) into /usr/local, so both
 # trees must be copied or the symlinks dangle and all binaries go missing
-RUN rm -rf /usr/local/*
-COPY --from=build-stage /usr/edb /usr/edb
+RUN rm -rf /usr/local/* /usr/edb/*
 COPY --from=build-stage /usr/local /usr/local
+COPY --from=build-stage /usr/edb /usr/edb
 
 
 # NOTE: unlike the tail-based image, we stay as root here.

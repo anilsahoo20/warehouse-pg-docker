@@ -205,7 +205,7 @@ EXPOSE 30000-30010/tcp
 # copy installation over from the build stage image
 # warehouse-pg-7 installs into /usr/edb/whpg7 and creates a symlink
 # /usr/local/greenplum-db -> /usr/edb/whpg7, so both paths must be copied
-RUN rm -rf /usr/local/*
+RUN rm -rf /usr/local/* /usr/edb/*
 COPY --from=build-stage /usr/local /usr/local
 COPY --from=build-stage /usr/edb /usr/edb
 

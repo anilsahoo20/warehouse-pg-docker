@@ -4,7 +4,7 @@ services:
       context: .
       dockerfile: Dockerfile
     ports:
-      - "6432:5432"
+      - "6440:5432"
     volumes:
       - ./data:/whpgdata
     environment:

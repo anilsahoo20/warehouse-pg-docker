@@ -181,6 +181,14 @@ fi
 echo "Sourcing greenplum_path.sh ..."
 source $WHPG_HOME/greenplum_path.sh
 echo "Sourcing greenplum_path.sh ... done"
+
+# Ensure required Python modules are available - the /usr/local bind mount can
+# hide modules baked into the image, so reinstall via the system package on restart
+if ! python3 -c "import psycopg2" >/dev/null 2>&1; then
+    echo "Python module 'psycopg2' not found - installing ..."
+    sudo dnf install -y python3-psycopg2
+fi
+
 if [ ! -f ${DATA_DIR}/coordinator/whpgsne-1/postgresql.conf ];
 then
     echo "Running gpinitsystem ..."

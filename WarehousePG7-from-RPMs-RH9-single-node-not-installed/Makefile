@@ -5,7 +5,7 @@ BUILD_IMAGE_DESCRIPTION="WarehousePG 7.x Database image"
 
 IMAGE_NAME="sne"
 HOST_NAME="whpgdb-primary"
-TCP_PORT="6432"
+TCP_PORT="6439"
 
 
 include ../token.mk
@@ -24,7 +24,9 @@ all:
 	@echo "psql:     Connect to the WarehousePG Database in the image"
 	@echo "access:   Get a shell in the image"
 	@echo "logs:     Show the Docker log for the image"
-	@echo "stop:     Stop the image"
+	@echo "stop:     Stop the image (preserves state)"
+	@echo "start:    Start a previously stopped image"
+	@echo "restart:  Restart the image"
 	@echo "clean:    Remove all artifacts"
 
 build:
@@ -33,7 +35,7 @@ build:
 	docker image prune -f
 	docker buildx prune -f
 
-run:	checklabsrunning
+run:
 	mkdir -p $(shell pwd)/data
 	mkdir -p $(shell pwd)/usr_local
 	DOCKER_BUILDKIT=1 docker compose up --detach
@@ -46,10 +48,18 @@ psql:
 
 stop:
 	docker compose stop -t 5
-	docker compose rm -f
 	docker compose ps -a
 
+start:
+	docker compose start
+	docker compose ps
+
+restart:
+	docker compose restart
+	docker compose ps
+
 clean:	stop checksudo
+	docker compose rm -f
 	@#sudo rm -rf data usr_local
 	@if [ -d data ] && [ $$(find data -mindepth 1 -not -uid $(CURRENT_UID) -print -quit | wc -l) -gt 0 ]; then \
 		sudo rm -rf data; \
@@ -84,4 +94,4 @@ checksudo:
 checklabsrunning:
 	../labs-are-running.sh
 
-.PHONY:	all build run psql access logs stop clean cleanall status checksudo checklabsrunning
+.PHONY:	all build run start restart psql access logs stop clean cleanall status checksudo checklabsrunning

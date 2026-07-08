@@ -31,6 +31,24 @@ stop-everything:	docker-running
 	cd WarehousePG7-from-RPMs-RH9-multi-node-standby-mirrors/ && make MAKELEVEL=0 stop
 	cd WarehousePG7-from-RPMs-RH9-single-node-not-installed/ && make MAKELEVEL=0 stop
 
+start-everything:	docker-running
+	cd WarehousePG6-from-source-RH7-single-node/ && make MAKELEVEL=0 start
+	cd WarehousePG7-from-source-RH9-single-node/ && make MAKELEVEL=0 start
+	cd WarehousePG6-from-RPMs-RH7-single-node/ && make MAKELEVEL=0 start
+	cd WarehousePG7-from-RPMs-RH9-single-node/ && make MAKELEVEL=0 start
+	cd WarehousePG7-from-RPMs-RH9-multi-node/ && make MAKELEVEL=0 start
+	cd WarehousePG7-from-RPMs-RH9-multi-node-standby-mirrors/ && make MAKELEVEL=0 start
+	cd WarehousePG7-from-RPMs-RH9-single-node-not-installed/ && make MAKELEVEL=0 start
+
+restart-everything:	docker-running
+	cd WarehousePG6-from-source-RH7-single-node/ && make MAKELEVEL=0 restart
+	cd WarehousePG7-from-source-RH9-single-node/ && make MAKELEVEL=0 restart
+	cd WarehousePG6-from-RPMs-RH7-single-node/ && make MAKELEVEL=0 restart
+	cd WarehousePG7-from-RPMs-RH9-single-node/ && make MAKELEVEL=0 restart
+	cd WarehousePG7-from-RPMs-RH9-multi-node/ && make MAKELEVEL=0 restart
+	cd WarehousePG7-from-RPMs-RH9-multi-node-standby-mirrors/ && make MAKELEVEL=0 restart
+	cd WarehousePG7-from-RPMs-RH9-single-node-not-installed/ && make MAKELEVEL=0 restart
+
 clean-everything:	docker-running
 	cd WarehousePG6-from-source-RH7-single-node/ && make MAKELEVEL=0 clean
 	cd WarehousePG7-from-source-RH9-single-node/ && make MAKELEVEL=0 clean
@@ -46,5 +64,5 @@ clean-docker:
 	docker system prune --all --force
 
 .PHONY: all
-.PHONY: docker-running build-everything stop-everything clean-everything
+.PHONY: docker-running build-everything stop-everything start-everything restart-everything clean-everything
 .PHONY: clean-data clean-docker

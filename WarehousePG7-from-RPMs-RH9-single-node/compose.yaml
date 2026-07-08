@@ -10,7 +10,7 @@ services:
       - edbtoken_secret
       - edbrepository_secret
     ports:
-      - "6432:5432"
+      - "6438:5432"
     volumes:
       - ./data:/whpgdata
     environment:

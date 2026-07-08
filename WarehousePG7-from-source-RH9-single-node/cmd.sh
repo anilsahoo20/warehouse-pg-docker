@@ -181,6 +181,16 @@ fi
 echo "Sourcing greenplum_path.sh ..."
 source ${WHPG_HOME}/greenplum_path.sh
 echo "Sourcing greenplum_path.sh ... done"
+
+# Ensure required Python modules are available - some restart scenarios can leave
+# the WarehousePG-bundled Python without these modules and gpstart/gpinitsystem fail
+for module in psycopg2 psutil; do
+    if ! python3.11 -c "import ${module}" >/dev/null 2>&1; then
+        echo "Python module '${module}' not found - installing ..."
+        sudo bash -c ". ${WHPG_HOME}/greenplum_path.sh && python3.11 -m pip install ${module}"
+    fi
+done
+
 if [ ! -f ${DATA_DIR}/coordinator/whpgsne-1/postgresql.conf ];
 then
     echo "Running gpinitsystem ..."

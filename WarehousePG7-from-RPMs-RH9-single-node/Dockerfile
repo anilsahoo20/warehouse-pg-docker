@@ -184,9 +184,10 @@ COPY --from=build-stage /usr/edb /usr/edb
 # switch to gpadmin user, do not build image as root
 USER gpadmin
 
-# we need a better way to make these modules available in the gpadmin Python installation
-RUN sudo bash -c ". ${WHPGHOME}/greenplum_path.sh && pip3 install psycopg2"
-RUN sudo bash -c ". ${WHPGHOME}/greenplum_path.sh && pip3 install psutil"
+# WarehousePG 7 uses Python 3.11, install required modules into that interpreter.
+# greenplum_path.sh puts WarehousePG's pg_config on PATH so psycopg2 can build from source.
+RUN sudo bash -c ". ${WHPGHOME}/greenplum_path.sh && python3.11 -m pip install psycopg2"
+RUN sudo bash -c ". ${WHPGHOME}/greenplum_path.sh && python3.11 -m pip install psutil"
 
 # Create data directories
 RUN sudo mkdir -p /whpgdata/coordinator /whpgdata/segments /whpgdata/segments/whpgdata1 /whpgdata/segments/whpgdata2 && \

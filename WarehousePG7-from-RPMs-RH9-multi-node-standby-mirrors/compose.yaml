@@ -18,7 +18,7 @@ services:
       - edbtoken_secret
       - edbrepository_secret
     ports:
-      - "6432:5432"
+      - "6436:5432"
     volumes:
       - ./data/coordinator/data:/whpgdata
 #      - ./data/coordinator/gpadmin_ssh:/home/gpadmin/.ssh
@@ -50,7 +50,7 @@ services:
       - edbtoken_secret
       - edbrepository_secret
     ports:
-      - "6433:5432"
+      - "6437:5432"
     volumes:
       - ./data:/whpgdata
       - ./data/standby/data:/whpgdata

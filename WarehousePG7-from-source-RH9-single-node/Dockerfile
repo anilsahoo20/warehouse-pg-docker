@@ -13,7 +13,7 @@ ARG GLOB_WHPG_INSTALL_DIR_PARENT=/usr/local
 ARG GLOB_WHPG_INSTALL_DIR_NAME=greenplum-db
 ARG GLOB_WHPG_INSTALL_DIR=$GLOB_WHPG_INSTALL_DIR_PARENT/$GLOB_WHPG_INSTALL_DIR_NAME
 ARG GLOB_WHPGHOME=${GLOB_WHPG_INSTALL_DIR}
-ARG GLOB_COORDINATOR_DATA_DIRECTORY=/whpgdata/coordinator/gpsne-1
+ARG GLOB_COORDINATOR_DATA_DIRECTORY=/whpgdata/coordinator/whpgsne-1
 ARG GLOB_WHPG_REPO_URL=https://github.com/warehouse-pg/warehouse-pg.git
 ARG GLOB_WHPG_REPO_TAG=main
 
@@ -114,8 +114,8 @@ RUN ./configure --enable-debug --with-perl --with-python --with-libxml --with-op
 
 RUN sudo make install
 
-RUN sudo bash -c ". ${WHPGHOME}/greenplum_path.sh && pip3 install psycopg2"
-RUN sudo bash -c ". ${WHPGHOME}/greenplum_path.sh && pip3 install psutil"
+RUN sudo bash -c ". ${WHPGHOME}/greenplum_path.sh && python3.11 -m pip install psycopg2"
+RUN sudo bash -c ". ${WHPGHOME}/greenplum_path.sh && python3.11 -m pip install psutil"
 
 
 #######################################################################

@@ -383,6 +383,15 @@ echo "Init completed ..."
 # at this point we already know that all containers are up and running
 if [ "${HOSTNAME}" == "coordinator" ];
 then
+    # Ensure required Python modules are available - some restart scenarios can leave
+    # the WarehousePG-bundled Python without these modules and gpstart/gpinitsystem fail
+    for module in psycopg2 psutil; do
+        if ! python3.11 -c "import ${module}" >/dev/null 2>&1; then
+            echo "Python module '${module}' not found - installing ..."
+            sudo bash -c ". ${WHPG_HOME}/greenplum_path.sh && python3.11 -m pip install ${module}"
+        fi
+    done
+
     # initialize the primary WarehousePG database
     # do NOT source greenplum_path.sh here, this will pollute the remaining script
     # instead use sub shells where greenplum_path.sh is required
@@ -398,7 +407,7 @@ then
         echo "Running gpinitsystem ... done"
     else
         echo "Starting WarehousePG ..."
-        ( source ${WHPG_HOME}/greenplum_path.sh && gpstart -a -d ${COORDINATOR_DATA_DIR}/whpgdr-1/ )
+        ( source ${WHPG_HOME}/greenplum_path.sh && gpstart -a -d ${COORDINATOR_DATA_DIR}/whpgmne-1/ )
         echo "Starting WarehousePG ... done"
     fi
 

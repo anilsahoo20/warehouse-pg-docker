@@ -1,9 +1,0 @@
-services:
-  sne:
-    # Use the committed snapshot that already has PXF installed/configured,
-    # the warehousepg.service fixes, GPHOME owned by gpadmin, the EDB repo,
-    # and gpadmin's ~/.bashrc.d/pxf.sh. Recreate with --no-build to keep it.
-    # Delete this line (and `docker compose build`) to go back to a clean build.
-    image: warehousepg7-from-rpms-rh9-single-node-systemd-sne:pxf-working
-    ports:
-      - "18080:8080"

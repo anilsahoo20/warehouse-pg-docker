@@ -1,0 +1,55 @@
+[Unit]
+Description=WarehousePG 6 multi-node role node with standby master + mirrors (coordinator/standby/segment/gpfdist)
+# gpinitsystem ssh's from the coordinator to every other host, so sshd must
+# be up first on every node
+After=network-online.target sshd.service
+Wants=network-online.target sshd.service
+# This image strips multi-user.target.wants/*, so systemd-user-sessions.service
+# (which removes /run/nologin) never runs on its own. Without it, pam_nologin
+# rejects gpadmin's ssh to other hosts ("System is booting up...") and
+# gpinitsystem fails its remote segment checks. Pull it in and order after it.
+After=systemd-user-sessions.service
+Wants=systemd-user-sessions.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+User=gpadmin
+Group=gpadmin
+WorkingDirectory=/home/gpadmin
+# the cross-host ssh handshake + gpinitsystem can take several minutes,
+# especially under emulation
+TimeoutStartSec=900
+TimeoutStopSec=120
+Environment=MASTER_DATA_DIRECTORY=/whpgdata/master/whpgmne-1
+Environment=PGPORT=5432
+Environment=PGUSER=gpadmin
+Environment=LANG=en_US.UTF-8
+
+
+# route this unit's own output straight to console (in addition to the
+# journal), so `docker logs`/Docker Desktop's Logs tab shows gpinitsystem/
+# gpstart/gpstop/gpfdist output directly, without depending on journald's
+# ForwardToConsole (which would also dump sshd/systemd noise into it).
+StandardOutput=journal+console
+StandardError=journal+console
+
+# pre-flight: gpadmin/root ssh keys, cross-host key exchange (runs on every node)
+ExecStartPre=/usr/local/bin/warehousepg-setup.sh
+
+# role-branching: gpinitsystem/gpstart on coordinator, gpfdist daemon on
+# the gpfdist host, no-op on standby/seg1/seg2
+ExecStart=/usr/local/bin/warehousepg-start.sh
+
+# DEV/LAB ONLY: coordinator-only, opens trust access over the container
+# network, then reloads. Do NOT do this in production.
+ExecStartPost=/usr/local/bin/warehousepg-poststart.sh
+
+# best-effort: only the coordinator can gpstop the cluster (over ssh to the
+# other hosts), and only if they're still reachable when this container is
+# torn down -- tolerate failure here, same as the tail-based lab which had
+# no graceful shutdown step at all.
+ExecStop=/bin/bash -lc 'HOSTNAME=$(hostname); if [ "$HOSTNAME" = "coordinator" ]; then (source /usr/local/greenplum-db/greenplum_path.sh && gpstop -a -M fast -d /whpgdata/master/whpgmne-1/) 2>/dev/null || true; fi'
+
+[Install]
+WantedBy=multi-user.target

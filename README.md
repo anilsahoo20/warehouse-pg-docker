@@ -63,6 +63,16 @@ The following setups are multi-node:
 - `WarehousePG7-from-RPMs-RH9-multi-node` (no standby coordinator, no mirror segments)
 - `WarehousePG7-from-RPMs-RH9-multi-node-standby-mirrors` (includes standby coordinator, includes mirror segments)
 
+## systemd Labs
+
+The `systemd-labs/` directory has systemd-managed variants of these labs
+(WarehousePG 6 and 7, CentOS7/Rocky8/Rocky9, single-node and multi-node)
+— every container boots systemd as PID 1 and runs WarehousePG (and sshd)
+as real systemd units instead of `cmd.sh` + `tail -f /dev/null`, closer
+to how these OSes behave on a real host. See
+[systemd-labs/README.md](systemd-labs/README.md) for the full list, port
+map, and usage.
+
 ## Interactive Training
 
 For detailed instructions on setting up WarehousePG from scratch, please refer to the [training](training.md) document.

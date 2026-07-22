@@ -1,0 +1,61 @@
+[Unit]
+Description=WarehousePG 6 single-node (master + 2 segments)
+# gpinitsystem / gpstart ssh to localhost even single-node, so sshd must be up first
+After=network-online.target sshd.service
+Wants=network-online.target sshd.service
+# This image strips multi-user.target.wants/*, so systemd-user-sessions.service
+# (which removes /run/nologin) never runs on its own. Without it, pam_nologin
+# rejects gpadmin's ssh-to-localhost ("System is booting up...") and gpinitsystem
+# fails its remote segment checks. Pull it in and order after it.
+After=systemd-user-sessions.service
+Wants=systemd-user-sessions.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+User=gpadmin
+Group=gpadmin
+# gpinitsystem reads MACHINE_LIST_FILE=./hostfile_whpginitsystem (relative) from
+# the config; systemd's default CWD is /, so run from gpadmin's home where the
+# hostfile lives. (bash -lc does not cd to home on its own.)
+WorkingDirectory=/home/gpadmin
+# gpinitsystem can take a few minutes on first boot
+TimeoutStartSec=600
+TimeoutStopSec=120
+Environment=MASTER_DATA_DIRECTORY=/whpgdata/master/whpgsne-1
+Environment=PGPORT=5432
+Environment=PGUSER=gpadmin
+Environment=LANG=en_US.UTF-8
+
+
+# route this unit's own output straight to console (in addition to the
+# journal), so `docker logs`/Docker Desktop's Logs tab shows gpinitsystem/
+# gpstart/gpstop/gpfdist output directly, without depending on journald's
+# ForwardToConsole (which would also dump sshd/systemd noise into it).
+StandardOutput=journal+console
+StandardError=journal+console
+
+# pre-flight: gpadmin ssh-to-localhost keys + bundled-python modules
+ExecStartPre=/usr/local/bin/warehousepg-setup.sh
+
+# first boot -> gpinitsystem; every boot after -> gpstart
+# gpinitsystem exits 1 whenever it logs a WARN (e.g. the expected trust-auth
+# pg_hba.conf notice) even on a fully successful init, so its exit code is
+# not a reliable success signal here -- same as the old cmd.sh, which never
+# checked it either. Tolerate it with `|| true`.
+ExecStart=/bin/bash -lc 'source /usr/local/greenplum-db/greenplum_path.sh && \
+  if [ ! -f /whpgdata/master/whpgsne-1/postgresql.conf ]; then \
+    gpinitsystem -c /home/gpadmin/whpginitsystem_singlenode -m 100 -a || true; \
+  else \
+    gpstart -a -d /whpgdata/master/whpgsne-1/; \
+  fi'
+
+# DEV/LAB ONLY: open trust access over the container network, then reload.
+# Do NOT do this in production.
+ExecStartPost=/usr/local/bin/warehousepg-poststart.sh
+
+ExecStop=/bin/bash -lc 'source /usr/local/greenplum-db/greenplum_path.sh && \
+  gpstop -a -M fast -d /whpgdata/master/whpgsne-1/'
+
+[Install]
+WantedBy=multi-user.target

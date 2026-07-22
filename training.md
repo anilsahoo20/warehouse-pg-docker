@@ -1,13 +1,13 @@
 # WarehousePG Training
 
-The `WarehousePG7-from-RPMs-single-node-not-installed` lab is prepared to install your own *WarehousePG*.
+The `WarehousePG7-from-RPMs-RH9-single-node-not-installed` lab is prepared to install your own *WarehousePG*.
 
 ## How to build
 
 Change into the directory:
 
 ```
-cd WarehousePG7-from-RPMs-single-node-not-installed
+cd WarehousePG7-from-RPMs-RH9-single-node-not-installed
 ```
 
 Build the lab:
@@ -171,3 +171,11 @@ make clean
 ```
 
 This stops the container, and removes all data. You can start over fresh.
+
+## systemd variant
+
+`systemd-labs/WarehousePG7-from-RPMs-RH9-single-node-not-installed-systemd`
+is the same not-installed lab, but boots systemd as PID 1 with
+`sshd.service` already running (no manual `ssh-keygen -A` / `sshd`
+startup needed) — a more realistic RHEL9-like OS to practice the manual
+install on. See that lab's `README.md` for the (shorter) install walk-through.

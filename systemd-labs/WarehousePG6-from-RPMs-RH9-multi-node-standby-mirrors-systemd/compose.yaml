@@ -1,0 +1,213 @@
+services:
+  coordinator:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      secrets:
+        - edbtoken_secret
+        - edbrepository_secret
+    deploy:
+      resources:
+        limits:
+          cpus: 4.0
+          memory: 4gb
+        reservations:
+          cpus: 1.0
+          memory: 1gb
+    secrets:
+      - edbtoken_secret
+      - edbrepository_secret
+    ports:
+      - "6457:5432"
+      - "18092:8080"
+      - "17245:7233"
+    volumes:
+      - ./data/coordinator/data:/whpgdata
+      - /sys/fs/cgroup:/sys/fs/cgroup:rw
+    cgroup: host
+
+    # without an allocated pty, /dev/console never gets created inside the
+    # container, so ForwardToConsole/StandardOutput=...+console has nowhere
+    # to write and `docker logs` stays empty no matter what journald says
+    tty: true
+    tmpfs:
+      - /run
+      - /tmp
+    stop_signal: SIGRTMIN+3
+    stop_grace_period: 60s
+    environment:
+      - container=docker
+    platform: linux/amd64
+    hostname: coordinator
+    networks:
+      whpg-sme-network:
+
+  standby:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      secrets:
+        - edbtoken_secret
+        - edbrepository_secret
+    deploy:
+      resources:
+        limits:
+          cpus: 4.0
+          memory: 4gb
+        reservations:
+          cpus: 1.0
+          memory: 1gb
+    secrets:
+      - edbtoken_secret
+      - edbrepository_secret
+    ports:
+      - "6458:5432"
+    volumes:
+      - ./data/standby/data:/whpgdata
+      - /sys/fs/cgroup:/sys/fs/cgroup:rw
+    cgroup: host
+
+    # without an allocated pty, /dev/console never gets created inside the
+    # container, so ForwardToConsole/StandardOutput=...+console has nowhere
+    # to write and `docker logs` stays empty no matter what journald says
+    tty: true
+    tmpfs:
+      - /run
+      - /tmp
+    stop_signal: SIGRTMIN+3
+    stop_grace_period: 60s
+    environment:
+      - container=docker
+    platform: linux/amd64
+    hostname: standby
+    networks:
+      whpg-sme-network:
+
+  seg1:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      secrets:
+        - edbtoken_secret
+        - edbrepository_secret
+    deploy:
+      resources:
+        limits:
+          cpus: 4.0
+          memory: 4gb
+        reservations:
+          cpus: 2.0
+          memory: 2gb
+    secrets:
+      - edbtoken_secret
+      - edbrepository_secret
+    volumes:
+      - ./data/seg1/data:/whpgdata
+      - /sys/fs/cgroup:/sys/fs/cgroup:rw
+    cgroup: host
+
+    # without an allocated pty, /dev/console never gets created inside the
+    # container, so ForwardToConsole/StandardOutput=...+console has nowhere
+    # to write and `docker logs` stays empty no matter what journald says
+    tty: true
+    tmpfs:
+      - /run
+      - /tmp
+    stop_signal: SIGRTMIN+3
+    stop_grace_period: 60s
+    environment:
+      - container=docker
+    platform: linux/amd64
+    hostname: seg1
+    networks:
+      whpg-sme-network:
+
+  seg2:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      secrets:
+        - edbtoken_secret
+        - edbrepository_secret
+    deploy:
+      resources:
+        limits:
+          cpus: 4.0
+          memory: 4gb
+        reservations:
+          cpus: 2.0
+          memory: 2gb
+    secrets:
+      - edbtoken_secret
+      - edbrepository_secret
+    volumes:
+      - ./data/seg2/data:/whpgdata
+      - /sys/fs/cgroup:/sys/fs/cgroup:rw
+    cgroup: host
+
+    # without an allocated pty, /dev/console never gets created inside the
+    # container, so ForwardToConsole/StandardOutput=...+console has nowhere
+    # to write and `docker logs` stays empty no matter what journald says
+    tty: true
+    tmpfs:
+      - /run
+      - /tmp
+    stop_signal: SIGRTMIN+3
+    stop_grace_period: 60s
+    environment:
+      - container=docker
+    platform: linux/amd64
+    hostname: seg2
+    networks:
+      whpg-sme-network:
+
+  gpfdist:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      secrets:
+        - edbtoken_secret
+        - edbrepository_secret
+    deploy:
+      resources:
+        limits:
+          cpus: 2.0
+          memory: 1gb
+        reservations:
+          cpus: 1.0
+          memory: 1gb
+    secrets:
+      - edbtoken_secret
+      - edbrepository_secret
+    volumes:
+      - ./data/gpfdist/data:/whpgdata
+      - /sys/fs/cgroup:/sys/fs/cgroup:rw
+    cgroup: host
+
+    # without an allocated pty, /dev/console never gets created inside the
+    # container, so ForwardToConsole/StandardOutput=...+console has nowhere
+    # to write and `docker logs` stays empty no matter what journald says
+    tty: true
+    tmpfs:
+      - /run
+      - /tmp
+    stop_signal: SIGRTMIN+3
+    stop_grace_period: 60s
+    environment:
+      - container=docker
+    platform: linux/amd64
+    hostname: gpfdist
+    networks:
+      whpg-sme-network:
+
+
+secrets:
+  edbtoken_secret:
+    environment: EDBTOKEN
+  edbrepository_secret:
+    environment: EDBREPOSITORY
+
+
+networks:
+  whpg-sme-network:
+    driver: bridge

@@ -233,6 +233,18 @@ RUN echo "SELECT * from gp_segment_configuration;" >> /home/gpadmin/.psql_histor
 # no warehousepg.service to enable here -- nothing is installed or
 # configured yet, so there's nothing to auto-start. Only sshd, so the
 # trainee gets a realistic systemd-managed OS to install/gpinitsystem by hand.
+# The openssh-server RPM's post-install script bakes host keys into the
+# image at build time with mode 0640 (group-readable). sshd hard-refuses
+# to start with keys that permissive ("Permissions 0640 for ... are too
+# open" -> "no hostkeys available -- exiting"), which cascades into
+# warehousepg.service failing on every node ("sshd on host <X> is not
+# available!"). Because the keys are baked in (not absent),
+# sshd-keygen@.service's ConditionFileNotEmpty=|!/etc/ssh/ssh_host_%i_key
+# never fires to fix them on boot -- this bites every fresh container. Fix
+# it once at the source: drop the baked-in keys so each container
+# generates its own correctly-permissioned (0600) host keys on first boot.
+RUN rm -f /etc/ssh/ssh_host_*_key /etc/ssh/ssh_host_*_key.pub
+
 RUN systemctl enable sshd.service
 
 

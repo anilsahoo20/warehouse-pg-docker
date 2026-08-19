@@ -35,7 +35,14 @@ build:
 
 run:
 	mkdir -p $(shell pwd)/data
-	DOCKER_BUILDKIT=1 docker compose up --detach
+	@# Docker Desktop's VirtioFS bind-mount cache can lag behind
+	@# directories created just above -- docker compose then tries to
+	@# mount all containers at once and one of them sees a stale (pre-
+	@# mkdir) view, failing with "no such file or directory". Warm the
+	@# cache with a throwaway container walk before compose starts.
+	@docker run --rm -v "$(shell pwd)/data:/mnt/data" alpine find /mnt/data >/dev/null 2>&1 || true
+	DOCKER_BUILDKIT=1 docker compose up --detach || \
+		(echo "Retrying once (Docker Desktop mount cache was still catching up)..." && sleep 2 && DOCKER_BUILDKIT=1 docker compose up --detach)
 
 status:
 	docker compose ps

@@ -273,6 +273,18 @@ COPY --chown=gpadmin:gpadmin --chmod=0750 warehousepg_init6.sh /home/gpadmin/war
 COPY --chmod=0755 warehousepg-setup.sh /usr/local/bin/warehousepg-setup.sh
 COPY --chmod=0755 warehousepg-poststart.sh /usr/local/bin/warehousepg-poststart.sh
 COPY warehousepg.service /etc/systemd/system/warehousepg.service
+# The openssh-server RPM's post-install script bakes host keys into the
+# image at build time with mode 0640 (group-readable). sshd hard-refuses
+# to start with keys that permissive ("Permissions 0640 for ... are too
+# open" -> "no hostkeys available -- exiting"), which cascades into
+# warehousepg.service failing on every node ("sshd on host <X> is not
+# available!"). Because the keys are baked in (not absent),
+# sshd-keygen@.service's ConditionFileNotEmpty=|!/etc/ssh/ssh_host_%i_key
+# never fires to fix them on boot -- this bites every fresh container. Fix
+# it once at the source: drop the baked-in keys so each container
+# generates its own correctly-permissioned (0600) host keys on first boot.
+RUN rm -f /etc/ssh/ssh_host_*_key /etc/ssh/ssh_host_*_key.pub
+
 RUN systemctl enable sshd.service warehousepg.service
 
 

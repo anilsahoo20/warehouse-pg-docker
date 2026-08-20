@@ -242,6 +242,18 @@ COPY warehousepg.service /etc/systemd/system/warehousepg.service
 # generates its own correctly-permissioned (0600) host keys on first boot.
 RUN rm -f /etc/ssh/ssh_host_*_key /etc/ssh/ssh_host_*_key.pub
 
+# Force sshd host-key permissions to 0600 unconditionally on every boot,
+# regardless of whether the keys are freshly generated or pre-existing.
+# sshd-keygen@.service only fixes perms when key files are absent
+# (ConditionFileNotEmpty), so it does nothing if keys already exist but
+# have drifted to 0640 -- which has been observed to happen across a real
+# Docker Desktop VM restart (not just `docker restart`), even though
+# sshd started fine with those same keys moments before. This ExecStartPre
+# runs every time sshd.service starts, independent of that condition.
+RUN mkdir -p /etc/systemd/system/sshd.service.d && \
+    printf '%s\n' '[Service]' 'ExecStartPre=-/bin/sh -c "/bin/chmod 600 /etc/ssh/ssh_host_*_key"' \
+      > /etc/systemd/system/sshd.service.d/fix-host-key-perms.conf
+
 RUN systemctl enable sshd.service warehousepg.service
 
 

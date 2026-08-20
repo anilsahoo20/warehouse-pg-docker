@@ -1,5 +1,6 @@
 services:
   coordinator:
+    restart: unless-stopped
     build:
       context: .
       dockerfile: Dockerfile

@@ -209,6 +209,13 @@ COPY --chown=gpadmin:gpadmin whpginitsystem_multinode7 /home/gpadmin/whpginitsys
 COPY --chown=gpadmin:gpadmin --chmod=0750 warehousepg_init7.sh /home/gpadmin/warehousepg_init.sh
 COPY --chown=gpadmin:gpadmin --chmod=0755 list-seg-ports.sh /home/gpadmin/list-seg-ports.sh
 COPY --chown=gpadmin:gpadmin --chmod=0750 cmd.sh /home/gpadmin/cmd.sh
+# The openssh-server RPM's post-install script bakes host keys into the
+# image at build time with mode 0640 (group-readable). sshd refuses to
+# start with keys that permissive. cmd.sh calls ssh-keygen -A on every
+# container start, but ssh-keygen -A only generates keys that are absent
+# -- it won't fix or replace baked-in 0640 keys. Drop them here so
+# ssh-keygen -A always regenerates them with correct 0600 permissions.
+RUN sudo rm -f /etc/ssh/ssh_host_*_key /etc/ssh/ssh_host_*_key.pub
 WORKDIR /home/gpadmin
 
 

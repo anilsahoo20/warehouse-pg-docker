@@ -185,6 +185,12 @@ COPY --chown=gpadmin:gpadmin whpginitsystem_singlenode7 /home/gpadmin/whpginitsy
 # the chmod option needs buildx
 COPY --chown=gpadmin:gpadmin --chmod=0750 warehousepg_init7.sh /home/gpadmin/warehousepg_init.sh
 COPY --chown=gpadmin:gpadmin --chmod=0750 cmd.sh /home/gpadmin/cmd.sh
+# The openssh-server RPM's post-install script bakes host keys into the
+# image at build time with mode 0640 (group-readable). sshd refuses to
+# start with keys that permissive. Drop them here so ssh-keygen -A
+# always regenerates them with correct 0600 permissions if sshd is
+# started manually in this exploration lab.
+RUN sudo rm -f /etc/ssh/ssh_host_*_key /etc/ssh/ssh_host_*_key.pub
 WORKDIR /home/gpadmin
 
 

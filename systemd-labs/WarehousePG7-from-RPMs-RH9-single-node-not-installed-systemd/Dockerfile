@@ -254,7 +254,7 @@ RUN rm -f /etc/ssh/ssh_host_*_key /etc/ssh/ssh_host_*_key.pub
 # sshd started fine with those same keys moments before. This ExecStartPre
 # runs every time sshd.service starts, independent of that condition.
 RUN mkdir -p /etc/systemd/system/sshd.service.d && \
-    printf '%s\n' '[Service]' 'ExecStartPre=-/bin/sh -c "/bin/chmod 600 /etc/ssh/ssh_host_*_key"' \
+    printf '%s\n' '[Service]' 'ExecStartPre=-/bin/sh -c "find /etc/ssh -name ssh_host_*_key -exec chmod 600 {} +"' \
       > /etc/systemd/system/sshd.service.d/fix-host-key-perms.conf
 
 RUN systemctl enable sshd.service

@@ -165,45 +165,45 @@ services:
     networks:
       whpg-sme-network:
 
-  gpfdist:
-    restart: unless-stopped
-    build:
-      context: .
-      dockerfile: Dockerfile
-      secrets:
-        - edbtoken_secret
-        - edbrepository_secret
-    deploy:
-      resources:
-        limits:
-          cpus: 2.0
-          memory: 1gb
-        reservations:
-          cpus: 1.0
-          memory: 1gb
-    secrets:
-      - edbtoken_secret
-      - edbrepository_secret
-    volumes:
-      - ./data/gpfdist/data:/whpgdata
-      - /sys/fs/cgroup:/sys/fs/cgroup:rw
-    cgroup: host
+  #   gpfdist:
+  #     restart: unless-stopped
+  #     build:
+  #       context: .
+  #       dockerfile: Dockerfile
+  #       secrets:
+  #         - edbtoken_secret
+  #         - edbrepository_secret
+  #     deploy:
+  #       resources:
+  #         limits:
+  #           cpus: 2.0
+  #           memory: 1gb
+  #         reservations:
+  #           cpus: 1.0
+  #           memory: 1gb
+  #     secrets:
+  #       - edbtoken_secret
+  #       - edbrepository_secret
+  #     volumes:
+  #       - ./data/gpfdist/data:/whpgdata
+  #       - /sys/fs/cgroup:/sys/fs/cgroup:rw
+  #     cgroup: host
 
-    # without an allocated pty, /dev/console never gets created inside the
-    # container, so ForwardToConsole/StandardOutput=...+console has nowhere
-    # to write and `docker logs` stays empty no matter what journald says
-    tty: true
-    tmpfs:
-      - /run
-      - /tmp
-    stop_signal: SIGRTMIN+3
-    stop_grace_period: 60s
-    environment:
-      - container=docker
-    platform: linux/amd64
-    hostname: gpfdist
-    networks:
-      whpg-sme-network:
+  #     # without an allocated pty, /dev/console never gets created inside the
+  #     # container, so ForwardToConsole/StandardOutput=...+console has nowhere
+  #     # to write and `docker logs` stays empty no matter what journald says
+  #     tty: true
+  #     tmpfs:
+  #       - /run
+  #       - /tmp
+  #     stop_signal: SIGRTMIN+3
+  #     stop_grace_period: 60s
+  #     environment:
+  #       - container=docker
+  #     platform: linux/amd64
+  #     hostname: gpfdist
+  #     networks:
+  #       whpg-sme-network:
 
 
 secrets:

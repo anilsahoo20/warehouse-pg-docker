@@ -220,6 +220,12 @@ COPY --chown=gpadmin:gpadmin --chmod=0750 warehousepg_init7.sh /home/gpadmin/war
 # systemd-managed WarehousePG: a first-boot prep script + a unit that
 # runs gpinitsystem (first boot) or gpstart (subsequent boots) as gpadmin
 COPY --chmod=0755 warehousepg-setup.sh /usr/local/bin/warehousepg-setup.sh
+
+# see warehousepg-setup.sh for why this exists (Docker Desktop's Exec
+# tab runs `/bin/sh`, which as bash-under-the-name-sh reads $ENV, not
+# ~/.bashrc)
+COPY --chmod=0644 whpg-root-autohop.sh /etc/whpg-root-autohop.sh
+ENV ENV=/etc/whpg-root-autohop.sh
 COPY --chmod=0755 warehousepg-poststart.sh /usr/local/bin/warehousepg-poststart.sh
 COPY warehousepg.service /etc/systemd/system/warehousepg.service
 # The openssh-server RPM's post-install script bakes host keys into the
@@ -243,7 +249,7 @@ RUN rm -f /etc/ssh/ssh_host_*_key /etc/ssh/ssh_host_*_key.pub
 # sshd started fine with those same keys moments before. This ExecStartPre
 # runs every time sshd.service starts, independent of that condition.
 RUN mkdir -p /etc/systemd/system/sshd.service.d && \
-    printf '%s\n' '[Service]' 'ExecStartPre=-/bin/sh -c "/bin/chmod 600 /etc/ssh/ssh_host_*_key"' \
+    printf '%s\n' '[Service]' 'ExecStartPre=-/bin/sh -c "find /etc/ssh -name ssh_host_*_key -exec chmod 600 {} +"' \
       > /etc/systemd/system/sshd.service.d/fix-host-key-perms.conf
 
 RUN systemctl enable sshd.service warehousepg.service

@@ -118,6 +118,7 @@ sleep ${JITTER}
 SSH_HOSTFILE="/home/${WHPG_USER}/hostfile_ssh_whpginitsystem"
 while IFS= read -r host; do
     [[ -z "${host}" ]] && continue
+    [[ "${host}" =~ ^#.*$ ]] && continue
 
     host_available=0
     for ((i=0; i<120; i++)); do
@@ -198,7 +199,7 @@ done < ${SSH_HOSTFILE}
 
 # converge check: wait until every segment host actually appears in our
 # authorized_keys (they push to us just as we push to them, concurrently)
-SSH_HOSTS=$(cat "${SSH_HOSTFILE}")
+SSH_HOSTS=$(grep -vE "^[[:space:]]*(#|$)" "${SSH_HOSTFILE}")
 SSH_ALL_HOSTS_FOUND=1
 for i in {1..120}; do
     SSH_ALL_HOSTS_FOUND=0
@@ -217,6 +218,53 @@ done
 if [ $SSH_ALL_HOSTS_FOUND -ne 0 ]; then
     echo "ERROR: Not all hosts were confirmed in authorized_keys after 120 attempts"
     exit 1
+fi
+
+# populate ~/.bash_history with common commands for easier interactive debugging
+if [ ! -f /home/${WHPG_USER}/.bash_history ]; then
+    touch /home/${WHPG_USER}/.bash_history
+    chown ${WHPG_USER}:${WHPG_USER} /home/${WHPG_USER}/.bash_history
+    chmod 0600 /home/${WHPG_USER}/.bash_history
+    echo "source /usr/local/greenplum-db/greenplum_path.sh" >> /home/${WHPG_USER}/.bash_history
+    echo "psql whpgtest" >> /home/${WHPG_USER}/.bash_history
+    echo "sudo /bin/bash --login" >> /home/${WHPG_USER}/.bash_history
+    if [ "${HOSTNAME}" == "coordinator" -o "${HOSTNAME}" == "standby" ]; then
+        echo "gpstart -a" >> /home/${WHPG_USER}/.bash_history
+        echo "gpstop -a -M fast" >> /home/${WHPG_USER}/.bash_history
+        echo "gpstate -a" >> /home/${WHPG_USER}/.bash_history
+    fi
+fi
+
+# ensure ~/.bashrc sources greenplum_path.sh automatically on exec
+if [ ! -f /home/${WHPG_USER}/.bashrc ] || ! grep -q "greenplum_path.sh" /home/${WHPG_USER}/.bashrc; then
+    if [ ! -f /home/${WHPG_USER}/.bashrc ]; then
+        touch /home/${WHPG_USER}/.bashrc
+        chown ${WHPG_USER}:${WHPG_USER} /home/${WHPG_USER}/.bashrc
+        chmod 0644 /home/${WHPG_USER}/.bashrc
+    fi
+    echo "source /usr/local/greenplum-db/greenplum_path.sh" >> /home/${WHPG_USER}/.bashrc
+fi
+
+# export COORDINATOR_DATA_DIRECTORY on coordinator/standby so gpstate/gpstart/gpstop
+# work on interactive login without needing to pass -d
+if [ "${HOSTNAME}" == "coordinator" -o "${HOSTNAME}" == "standby" ]; then
+    if ! grep -q "export COORDINATOR_DATA_DIRECTORY=" /home/${WHPG_USER}/.bashrc 2>/dev/null; then
+        echo "export COORDINATOR_DATA_DIRECTORY=/whpgdata/coordinator/whpgmne-1" >> /home/${WHPG_USER}/.bashrc
+    fi
+fi
+
+
+# Docker Desktop's "Exec" tab runs `docker exec -it <c> /bin/sh`. On this
+# image /bin/sh is bash invoked under the name "sh", and an interactive
+# sh-named bash does NOT read ~/.bashrc -- per POSIX sh-compat startup
+# rules it reads the file named by $ENV instead. A plain `docker exec -it
+# <c> bash` *does* read ~/.bashrc. So the gpadmin auto-hop has to fire
+# from both places; the shared, root-only-guarded logic lives in
+# /etc/whpg-root-autohop.sh (baked into the image; wired up for the sh
+# case via `ENV ENV=...` in the Dockerfile) so it stays safe even though
+# $ENV applies to every user's sh session in the container, not just root's.
+if ! sudo grep -q "whpg-root-autohop.sh" /root/.bashrc 2>/dev/null; then
+    echo ". /etc/whpg-root-autohop.sh" | sudo tee -a /root/.bashrc >/dev/null
 fi
 
 echo "warehousepg-setup.sh: pre-flight complete on $(hostname)"

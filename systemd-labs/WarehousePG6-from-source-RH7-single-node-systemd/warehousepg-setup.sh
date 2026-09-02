@@ -60,4 +60,49 @@ done
 # convenience: hostfile used by gpinitsystem
 hostname > /home/${WHPG_USER}/hostfile_whpginitsystem
 
+# populate ~/.bash_history with common commands for easier interactive debugging
+if [ ! -f /home/${WHPG_USER}/.bash_history ]; then
+    touch /home/${WHPG_USER}/.bash_history
+    chown ${WHPG_USER}:${WHPG_USER} /home/${WHPG_USER}/.bash_history
+    chmod 0600 /home/${WHPG_USER}/.bash_history
+    echo "source /usr/local/greenplum-db/greenplum_path.sh" >> /home/${WHPG_USER}/.bash_history
+    echo "psql whpgtest" >> /home/${WHPG_USER}/.bash_history
+    echo "sudo /bin/bash --login" >> /home/${WHPG_USER}/.bash_history
+    # single-node lab: this is the only host, always the coordinator
+    echo "gpstart -a" >> /home/${WHPG_USER}/.bash_history
+    echo "gpstop -a -M fast" >> /home/${WHPG_USER}/.bash_history
+    echo "gpstate -a" >> /home/${WHPG_USER}/.bash_history
+fi
+
+# ensure ~/.bashrc sources greenplum_path.sh automatically on exec
+if [ ! -f /home/${WHPG_USER}/.bashrc ] || ! grep -q "greenplum_path.sh" /home/${WHPG_USER}/.bashrc; then
+    if [ ! -f /home/${WHPG_USER}/.bashrc ]; then
+        touch /home/${WHPG_USER}/.bashrc
+        chown ${WHPG_USER}:${WHPG_USER} /home/${WHPG_USER}/.bashrc
+        chmod 0644 /home/${WHPG_USER}/.bashrc
+    fi
+    echo "source /usr/local/greenplum-db/greenplum_path.sh" >> /home/${WHPG_USER}/.bashrc
+fi
+
+# export MASTER_DATA_DIRECTORY so gpstate/gpstart/gpstop work on interactive login
+# without needing to pass -d -- single-node lab, this is the only host,
+# always the coordinator
+if ! grep -q "export MASTER_DATA_DIRECTORY=" /home/${WHPG_USER}/.bashrc 2>/dev/null; then
+    echo "export MASTER_DATA_DIRECTORY=/whpgdata/master/whpgsne-1" >> /home/${WHPG_USER}/.bashrc
+fi
+
+
+# Docker Desktop's "Exec" tab runs `docker exec -it <c> /bin/sh`. On this
+# image /bin/sh is bash invoked under the name "sh", and an interactive
+# sh-named bash does NOT read ~/.bashrc -- per POSIX sh-compat startup
+# rules it reads the file named by $ENV instead. A plain `docker exec -it
+# <c> bash` *does* read ~/.bashrc. So the gpadmin auto-hop has to fire
+# from both places; the shared, root-only-guarded logic lives in
+# /etc/whpg-root-autohop.sh (baked into the image; wired up for the sh
+# case via `ENV ENV=...` in the Dockerfile) so it stays safe even though
+# $ENV applies to every user's sh session in the container, not just root's.
+if ! sudo grep -q "whpg-root-autohop.sh" /root/.bashrc 2>/dev/null; then
+    echo ". /etc/whpg-root-autohop.sh" | sudo tee -a /root/.bashrc >/dev/null
+fi
+
 echo "warehousepg-setup.sh: pre-flight complete"

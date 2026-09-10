@@ -10,6 +10,7 @@ include ../../token.mk
 
 
 CURRENT_UID := $(shell id -u)
+VOLUME_NAMES := $(shell grep -E '^  [a-z0-9-]+-data:' compose.yaml | sed 's/://; s/^  //')
 
 
 all:
@@ -28,7 +29,7 @@ all:
 	@echo "restart:  Restart the image"
 	@echo "clean:    Remove all artifacts"
 
-build:
+build: ensure-volumes
 	@# Docker may create the data directories already - as root
 	mkdir -p $(shell pwd)/data
 	@for i in coordinator standby seg1 seg2 gpfdist; do mkdir -p data/$$i data/$$i/data; done
@@ -36,7 +37,7 @@ build:
 	docker image prune -f
 	docker buildx prune -f
 
-run:	checksudo
+run:	checksudo ensure-volumes
 	@mkdir -p data
 	@sudo chown `id -un`:`id -gn` data data/* ; true
 	@for i in coordinator standby seg1 seg2 gpfdist; do mkdir -p data/$$i data/$$i/data; done
@@ -48,6 +49,9 @@ run:	checksudo
 	@docker run --rm -v "$(shell pwd)/data:/mnt/data" alpine find /mnt/data >/dev/null 2>&1 || true
 	DOCKER_BUILDKIT=1 docker compose up --detach || \
 		(echo "Retrying once (Docker Desktop mount cache was still catching up)..." && sleep 2 && DOCKER_BUILDKIT=1 docker compose up --detach)
+
+ensure-volumes:
+	@for volume in $(VOLUME_NAMES); do docker volume inspect $$volume >/dev/null 2>&1 || docker volume create $$volume >/dev/null; done
 
 status:
 	docker compose ps

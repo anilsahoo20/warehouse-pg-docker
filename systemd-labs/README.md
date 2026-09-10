@@ -25,7 +25,6 @@ the fullest version of that comparison table.
 | `WarehousePG7-from-RPMs-RH8-single-node-systemd` | v7 | Rocky Linux 8 | single node |
 | `WarehousePG7-from-RPMs-RH9-single-node-systemd` | v7 | Rocky Linux 9 | single node |
 | `WarehousePG7-from-source-RH9-single-node-systemd` | v7 | Rocky Linux 9 | single node, built from source |
-| `WarehousePG7-from-RPMs-RH9-single-node-not-installed-systemd` | v7 | Rocky Linux 9 | single node, RPMs downloaded but not installed (training) |
 | `WarehousePG7-from-RPMs-RH9-multi-node-systemd` | v7 | Rocky Linux 9 | multi-node (no standby, no mirrors) |
 | `WarehousePG7-from-RPMs-RH8-multi-node-standby-mirrors-systemd` | v7 | Rocky Linux 8 | multi-node, standby coordinator + mirrors |
 | `WarehousePG7-from-RPMs-RH9-multi-node-standby-mirrors-systemd` | v7 | Rocky Linux 9 | multi-node, standby coordinator + mirrors |
@@ -40,21 +39,47 @@ uses `COORDINATOR_*` naming and Python 3.11.
 
 ## Host ports
 
-Every lab maps three container ports to a unique host port, incrementing
-across the whole set (multi-node labs map `5432` for both the coordinator
-*and* the standby, since both need to be reachable):
+Every lab maps its service ports to unique host ports, incrementing across
+the whole set (multi-node labs map `5432` for both the coordinator and the
+standby, since both need to be reachable):
 
 | Container port | Purpose | Host range |
 |---|---|---|
 | `5432` | PostgreSQL/WarehousePG | `6441`–`6460` |
-| `8080` | (reserved) | `18080`–`18093` |
-| `7233` | (reserved) | `17233`–`17246` |
+| `8080` | (reserved) | `18080`–`18098` |
+| `8081` | (reserved) | `18100`–`18118` |
+| `8123` | (reserved) | `18119`–`18124` |
+| `9000` | (reserved) | `19000`–`19005` |
 
 (The non-systemd labs in the parent directory use `5432`→`6432`-`6440`
 and one `8081`→`8080` mapping — no overlap with the systemd labs' ranges.)
 
 Run `make -n build` in any lab to see its exact port mapping, or check
 that lab's `compose.yaml`.
+
+## Data volumes
+
+Systemd labs use Docker-managed external volumes for `/whpgdata`. This avoids
+Docker Desktop for Mac VirtioFS ownership instability on bind mounts. Each
+lab's `Makefile` creates the external volume named in its `compose.yaml`
+automatically before `make build` or `make run`.
+
+```sh
+docker volume create VOLUME_NAME  # optional manual creation
+```
+
+To preserve an existing lab's data, copy it before starting the lab:
+
+```sh
+docker run --rm \
+	-v "$(pwd)/data:/source:ro" \
+	-v VOLUME_NAME:/target \
+	alpine sh -c 'cp -a /source/. /target/ && chown -R 1000:1000 /target'
+```
+
+For multi-node labs, repeat the command for each service data directory
+(`coordinator`, `standby`, `seg1`, and `seg2`) and its corresponding volume.
+The original `data/` directories are left untouched as a backup.
 
 ## Usage
 

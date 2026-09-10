@@ -7,9 +7,9 @@ services:
     ports:
       - "6443:5432"
       - "18083:8080"
-      - "17235:7233"
+      - "18103:8081"
     volumes:
-      - ./data:/whpgdata
+      - whpg6-rh7-source-single-data:/whpgdata
       # systemd needs the host cgroup hierarchy
       - /sys/fs/cgroup:/sys/fs/cgroup:rw
     # systemd-as-PID-1 requirements:
@@ -29,3 +29,7 @@ services:
       - container=docker
     platform: linux/amd64
     hostname: whpgdb-primary
+
+volumes:
+  whpg6-rh7-source-single-data:
+    external: true

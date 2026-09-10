@@ -20,10 +20,10 @@ services:
       - edbrepository_secret
     ports:
       - "6448:5432"
-      - "18087:8080"
-      - "17240:7233"
+      - "18086:8080"
+      - "18115:8081"
     volumes:
-      - ./data/coordinator/data:/whpgdata
+      - whpg7-rh9-standby-coordinator-data:/whpgdata
       - /sys/fs/cgroup:/sys/fs/cgroup:rw
     cgroup: host
 
@@ -64,12 +64,12 @@ services:
       - edbrepository_secret
     ports:
       - "6450:5432"
-      - "18095:8080"
-      - "18107:8123"
-      - "18101:8081"
+      - "18094:8080"
+      - "18116:8081"
+      - "18124:8123"
       - "19001:9000"
     volumes:
-      - ./data/standby/data:/whpgdata
+      - whpg7-rh9-standby-standby-data:/whpgdata
       - /sys/fs/cgroup:/sys/fs/cgroup:rw
     cgroup: host
 
@@ -109,7 +109,7 @@ services:
       - edbtoken_secret
       - edbrepository_secret
     volumes:
-      - ./data/seg1/data:/whpgdata
+      - whpg7-rh9-standby-seg1-data:/whpgdata
       - /sys/fs/cgroup:/sys/fs/cgroup:rw
     cgroup: host
 
@@ -149,7 +149,7 @@ services:
       - edbtoken_secret
       - edbrepository_secret
     volumes:
-      - ./data/seg2/data:/whpgdata
+      - whpg7-rh9-standby-seg2-data:/whpgdata
       - /sys/fs/cgroup:/sys/fs/cgroup:rw
     cgroup: host
 
@@ -220,3 +220,13 @@ secrets:
 networks:
   whpg-sme-network:
     driver: bridge
+
+volumes:
+  whpg7-rh9-standby-coordinator-data:
+    external: true
+  whpg7-rh9-standby-standby-data:
+    external: true
+  whpg7-rh9-standby-seg1-data:
+    external: true
+  whpg7-rh9-standby-seg2-data:
+    external: true

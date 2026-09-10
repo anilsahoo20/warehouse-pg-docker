@@ -13,9 +13,9 @@ services:
     ports:
       - "6441:5432"
       - "18081:8080"
-      - "17233:7233"
+      - "18100:8081"
     volumes:
-      - ./data:/whpgdata
+      - whpg6-rh7-single-data:/whpgdata
       # systemd needs the host cgroup hierarchy
       - /sys/fs/cgroup:/sys/fs/cgroup:rw
     # systemd-as-PID-1 requirements:
@@ -41,3 +41,7 @@ secrets:
     environment: EDBTOKEN
   edbrepository_secret:
     environment: EDBREPOSITORY
+
+volumes:
+  whpg6-rh7-single-data:
+    external: true

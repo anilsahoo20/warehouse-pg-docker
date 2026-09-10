@@ -9,6 +9,7 @@ TCP_PORT="6444"
 
 
 CURRENT_UID := $(shell id -u)
+VOLUME_NAMES := $(shell grep -E '^  [a-z0-9-]+-data:' compose.yaml | sed 's/://; s/^  //')
 
 
 all:
@@ -27,13 +28,13 @@ all:
 	@echo "restart:  Restart the image"
 	@echo "clean:    Remove all artifacts"
 
-build:
+build: ensure-volumes
 	mkdir -p $(shell pwd)/data
 	DOCKER_BUILDKIT=1 docker compose up --build --no-start --remove-orphans
 	docker image prune -f
 	docker buildx prune -f
 
-run:
+run: ensure-volumes
 	mkdir -p $(shell pwd)/data
 	@# Docker Desktop's VirtioFS bind-mount cache can lag behind
 	@# directories created just above -- docker compose then tries to
@@ -43,6 +44,9 @@ run:
 	@docker run --rm -v "$(shell pwd)/data:/mnt/data" alpine find /mnt/data >/dev/null 2>&1 || true
 	DOCKER_BUILDKIT=1 docker compose up --detach || \
 		(echo "Retrying once (Docker Desktop mount cache was still catching up)..." && sleep 2 && DOCKER_BUILDKIT=1 docker compose up --detach)
+
+ensure-volumes:
+	@for volume in $(VOLUME_NAMES); do docker volume inspect $$volume >/dev/null 2>&1 || docker volume create $$volume >/dev/null; done
 
 status:
 	docker compose ps

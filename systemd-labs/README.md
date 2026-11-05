@@ -29,6 +29,7 @@ the fullest version of that comparison table.
 | `WarehousePG7-from-RPMs-RH9-multi-node-systemd` | v7 | Rocky Linux 9 | multi-node (no standby, no mirrors) |
 | `WarehousePG7-from-RPMs-RH8-multi-node-standby-mirrors-systemd` | v7 | Rocky Linux 8 | multi-node, standby coordinator + mirrors |
 | `WarehousePG7-from-RPMs-RH9-multi-node-standby-mirrors-systemd` | v7 | Rocky Linux 9 | multi-node, standby coordinator + mirrors |
+| `WarehousePG7-from-RPMs-RH9-multi-node-50-segments-standby-mirrors-systemd` | v7 | Rocky Linux 9 | 50 segment hosts (1 primary + 1 mirror each), standby coordinator |
 
 WarehousePG 6 uses `MASTER_HOSTNAME`/`MASTER_DIRECTORY`/`MASTER_PORT`
 (v6 `gpinitsystem` terminology) and needs Python 2 (via the OS's native
